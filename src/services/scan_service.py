@@ -58,16 +58,16 @@ async def process_scan(file: UploadFile):
         doc_type = document["document_type"]
         fields = document["fields"]
 
-        file_size = len(contents)  # em bytes
-        file_extension = os.path.splitext(file.filename)[1].lower()
+        size = len(contents)  # em bytes
+        extension = os.path.splitext(file.filename)[1].lower()
 
         collection = db[doc_type]
         collection.insert_one({
             "fields": fields,
             "raw_text": extracted_text,
             "filename": file.filename,
-            "file_size": file_size,
-            "file_extension": file_extension
+            "size": size,
+            "extension": extension
         })
 
         return JSONResponse(content={
@@ -89,8 +89,8 @@ async def get_collections():
 
 async def get_documents_from_collection(collection_name: str):
     collection = db[collection_name]
-    documents = collection.find({}, {"_id": 0})
-    return list(documents)
+    documents = collection.find({})
+    return [{**doc, "_id": str(doc["_id"])} for doc in documents]
 
 
 async def delete_document_from_collection(collection_name: str, document_id: str):
