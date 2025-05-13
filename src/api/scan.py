@@ -7,8 +7,8 @@ router = APIRouter()
 
 @router.post("/scan-file")
 async def scan_file(file: UploadFile = File(...)):
-    if not file.filename.lower().endswith((".jpg", ".jpeg", ".png")):
-        raise HTTPException(status_code=400, detail="Only image files (.jpg, .jpeg, .png) are supported.")
+    if not file.filename.lower().endswith((".jpg", ".jpeg", ".png", ".pdf")):
+        raise HTTPException(status_code=400, detail="Invalid file type. Only JPG, JPEG, PNG, and PDF files are allowed.")
     return await process_scan(file)
 
 

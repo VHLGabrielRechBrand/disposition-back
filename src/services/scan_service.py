@@ -9,6 +9,7 @@ from openai import OpenAI
 from pymongo import MongoClient
 from dotenv import load_dotenv
 from bson.objectid import ObjectId
+from pdf2image import convert_from_bytes
 
 load_dotenv()
 
@@ -18,14 +19,23 @@ db = mongo[os.getenv("DATABASE_NAME")]
 
 
 async def process_scan(file: UploadFile):
-    with NamedTemporaryFile(delete=False, suffix=".jpg") as temp_file:
-        contents = await file.read()
-        temp_file.write(contents)
-        temp_path = temp_file.name
+    contents = await file.read()
+    extension = os.path.splitext(file.filename)[1].lower()
+    size = len(contents)  # em bytes
 
     try:
-        image = Image.open(temp_path)
-        extracted_text = pytesseract.image_to_string(image, lang='por')
+        if extension == ".pdf":
+            images = convert_from_bytes(contents)
+            extracted_text = ""
+            for image in images:
+                extracted_text += pytesseract.image_to_string(image, lang='por') + "\n"
+        else:
+            with NamedTemporaryFile(delete=False, suffix=extension) as temp_file:
+                temp_file.write(contents)
+                temp_path = temp_file.name
+            image = Image.open(temp_path)
+            extracted_text = pytesseract.image_to_string(image, lang='por')
+            os.remove(temp_path)
 
         prompt = f"""
         You are a document organization assistant. Your task is to identify the type of document and extract the main structured data in JSON format.
@@ -58,9 +68,6 @@ async def process_scan(file: UploadFile):
         doc_type = document["document_type"]
         fields = document["fields"]
 
-        size = len(contents)  # em bytes
-        extension = os.path.splitext(file.filename)[1].lower()
-
         collection = db[doc_type]
         collection.insert_one({
             "fields": fields,
@@ -79,8 +86,6 @@ async def process_scan(file: UploadFile):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal processing error: {str(e)}")
 
-    finally:
-        os.remove(temp_path)
 
 
 async def get_collections():
