@@ -1,6 +1,8 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Body
 from utils.custom_responses import CustomJSONResponse
 from services.file_service import FileService
+from pydantic import BaseModel
+from typing import List
 
 router = APIRouter()
 service = FileService()
@@ -36,3 +38,36 @@ def get_document(collection_name: str, document_id: str):
 @router.delete("/collection/{collection_name}/{document_id}")
 def delete_document(collection_name: str, document_id: str):
     return service.delete_document_from_collection(collection_name, document_id)
+
+
+class TagRequest(BaseModel):
+    tags: List[str]
+
+
+@router.get("/tags/{tag}")
+def search_by_tag(tag: str):
+    docs = service.get_documents_by_tag(tag)
+    return CustomJSONResponse(content={"documents": docs})
+
+
+@router.get("/tags")
+def list_all_tags():
+    tags = service.get_all_tags()
+    return CustomJSONResponse(content={"tags": tags})
+
+
+@router.post("/collection/{collection_name}/{document_id}/tags")
+def add_tags(collection_name: str, document_id: str, data: TagRequest = Body(...)):
+    if not data.tags:
+        raise HTTPException(status_code=400, detail="A list of tags is required")
+
+    invalid = [tag for tag in data.tags if not tag.strip() or len(tag) > 30]
+    if invalid:
+        raise HTTPException(status_code=400, detail=f"Invalid tags: {invalid}")
+
+    return service.add_tags_to_document(collection_name, document_id, data.tags)
+
+
+@router.delete("/collection/{collection}/{document_id}/tags")
+def remove_tags(collection: str, document_id: str, data: TagRequest):
+    return service.remove_tags_from_document(collection, document_id, data.tags)

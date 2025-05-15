@@ -109,6 +109,43 @@ class FileService(BaseService):
             print(f"Erro inesperado ao buscar documento: {e}")
             return None
 
+
+    def get_documents_by_tag(self, tag: str):
+        return list(self.collection.find({"tags": tag}))
+
+
+    def get_all_tags(self):
+        return self.collection.distinct("tags")
+
+
+    def add_tags_to_document(self, collection_name: str, document_id: str, tags: list):
+        try:
+            oid = ObjectId(document_id)
+            collection = self.db[collection_name]
+
+            result = collection.update_one(
+                {"_id": oid},
+                {"$addToSet": {"tags": {"$each": tags}}}
+            )
+
+            if result.matched_count == 0:
+                raise HTTPException(status_code=404, detail="Document not found")
+
+            return JSONResponse(content={
+                "status": "success",
+                "message": "Tags added successfully"
+            })
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error adding tags: {str(e)}")
+
+
+    def remove_tags_from_document(self, collection, document_id, tags):
+        return self.get_collection(collection).update_one(
+            {"_id": ObjectId(document_id)},
+            {"$pull": {"tags": {"$in": tags}}}
+        )
+
     def delete_document_from_collection(self, collection_name: str, document_id: str):
         try:
             result = self.db[collection_name].delete_one({"_id": ObjectId(document_id)})
