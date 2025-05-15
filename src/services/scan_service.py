@@ -10,6 +10,7 @@ from pymongo import MongoClient
 from dotenv import load_dotenv
 from bson.objectid import ObjectId
 from pdf2image import convert_from_bytes
+from datetime import datetime
 
 load_dotenv()
 
@@ -18,8 +19,8 @@ mongo = MongoClient(os.getenv("DATABASE_URL"))
 db = mongo[os.getenv("DATABASE_NAME")]
 
 
-async def process_scan(file: UploadFile):
-    contents = await file.read()
+def process_scan(file: UploadFile):
+    contents = file.file.read()
     extension = os.path.splitext(file.filename)[1].lower()
     size = len(contents)  # em bytes
 
@@ -69,12 +70,17 @@ async def process_scan(file: UploadFile):
         fields = document["fields"]
 
         collection = db[doc_type]
+
+        # Aqui pega o momento do scan
+        scanned_at = datetime.utcnow()
+
         collection.insert_one({
             "fields": fields,
             "raw_text": extracted_text,
             "filename": file.filename,
             "size": size,
-            "extension": extension
+            "extension": extension,
+            "scanned_at": scanned_at  # adiciona o campo datetime aqui
         })
 
         return JSONResponse(content={
@@ -87,18 +93,34 @@ async def process_scan(file: UploadFile):
         raise HTTPException(status_code=500, detail=f"Internal processing error: {str(e)}")
 
 
-
-async def get_collections():
+def get_collections():
     return db.list_collection_names()
 
 
-async def get_documents_from_collection(collection_name: str):
+def get_documents_from_collection(collection_name: str):
     collection = db[collection_name]
     documents = collection.find({})
     return [{**doc, "_id": str(doc["_id"])} for doc in documents]
 
 
-async def delete_document_from_collection(collection_name: str, document_id: str):
+def get_document_by_id(collection_name: str, document_id: str):
+    try:
+        oid = ObjectId(document_id)
+
+        collection = db[collection_name]
+
+        document = collection.find_one({"_id": oid})
+
+        if document:
+            document["_id"] = str(document["_id"])
+        return document
+
+    except Exception as e:
+        print(f"Erro inesperado ao buscar documento: {e}")
+        return None
+
+
+def delete_document_from_collection(collection_name: str, document_id: str):
     try:
         result = db[collection_name].delete_one({"_id": ObjectId(document_id)})
 
