@@ -18,6 +18,12 @@ class FileService(BaseService):
         extension = os.path.splitext(file.filename)[1].lower()
         size = len(contents)
 
+        user_config = self.db["user_configuration"].find_one({"user_id": user_id})
+        if not user_config or "model" not in user_config:
+            raise HTTPException(status_code=400, detail="Scan model not configured for user")
+
+        model_name = user_config["model"]
+
         try:
             if extension == ".pdf":
                 images = convert_from_bytes(contents)
@@ -55,7 +61,7 @@ class FileService(BaseService):
             """
 
             response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model=model_name,
                 messages=[{"role": "user", "content": prompt}]
             )
 
