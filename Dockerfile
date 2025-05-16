@@ -15,4 +15,6 @@ COPY . /app
 
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
+ENV PYTHONPATH=/app/src
+
 CMD ["uvicorn", "src.main:app", "--host=0.0.0.0", "--port=10000"]
